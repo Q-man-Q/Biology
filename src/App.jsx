@@ -83,7 +83,7 @@ export default function App() {
       (err) => {
         console.error("Firestore sync error:", err);
         if (err?.code === 'permission-denied') {
-          setCloudError("Внимание: Firebase блокирует доступ. Включите тестовый режим (allow read, write: if true;) в Firebase Console -> Firestore Database -> Rules.");
+          setCloudError("Внимание: База данных блокирует доступ. Нажмите синюю кнопку «Publish» (Опубликовать) на вкладке Rules в Firebase Console.");
         } else {
           setCloudError("Ошибка синхронизации с облаком Firebase: " + (err?.message || "Нет соединения"));
         }
