@@ -347,9 +347,13 @@ export default function App() {
               onDeleteObservation={handleDeleteObservation}
               onAddObservationAtCoords={handleAddObservationAtCoords}
               onSaveTransformedBoundaries={(newQuarters) => {
-                setReservePoints({
-                  quarters: newQuarters,
-                  outerBoundary: computeOuterBoundaryFromQuarters(newQuarters)
+                requireAuth(() => {
+                  const updatedPoints = {
+                    quarters: newQuarters,
+                    outerBoundary: computeOuterBoundaryFromQuarters(newQuarters)
+                  };
+                  setReservePoints(updatedPoints);
+                  saveReservePointsToCloud(updatedPoints);
                 });
               }}
             />
