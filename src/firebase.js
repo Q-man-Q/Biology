@@ -12,6 +12,8 @@ import {
   getAuth, 
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged 
 } from "firebase/auth";
@@ -29,6 +31,9 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
+
+// Check redirect result on load if user returned from redirect login
+getRedirectResult(auth).catch((err) => console.warn("Redirect auth result:", err));
 
 // List of Admin emails (add any admin emails here or configure dynamically)
 export const ADMIN_EMAILS = [
@@ -50,13 +55,19 @@ export function subscribeToAuth(onUserChange) {
   });
 }
 
-// Google Login
+// Google Login (with popup & redirect fallback)
 export async function loginWithGoogle() {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (error) {
     console.error("Google Sign-In Error:", error);
+    if (error.code === 'auth/unauthorized-domain') {
+      alert("⚠️ Домен приложения не авторизован в Firebase!\n\nПерейдите в Firebase Console -> Authentication -> Settings -> Authorized domains и добавьте ваш домен (q-man-q.github.io).");
+    } else if (error.code === 'auth/popup-blocked') {
+      // Fallback to redirect if popups are blocked by browser
+      await signInWithRedirect(auth, googleProvider);
+    }
     throw error;
   }
 }
