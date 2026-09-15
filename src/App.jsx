@@ -55,21 +55,8 @@ export default function App() {
 
   // Reserve Quarters and Outer Boundary state (persisted & synced)
   const [reservePoints, setReservePoints] = useState(() => {
-    const saved = localStorage.getItem('ebita_eco_reserve_points');
-    let quarters = importedPointsFile.quarters || [];
-
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.quarters && parsed.quarters.length > 0) {
-          quarters = parsed.quarters;
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    const outerBoundary = computeOuterBoundaryFromQuarters(quarters);
+    const quarters = importedPointsFile.quarters || [];
+    const outerBoundary = importedPointsFile.outerBoundary || computeOuterBoundaryFromQuarters(quarters);
     return {
       outerBoundary,
       quarters
@@ -125,6 +112,9 @@ export default function App() {
           quarters: cloudPoints.quarters,
           outerBoundary
         });
+      } else {
+        // Seed cloud with updated default boundaries JSON
+        saveReservePointsToCloud(importedPointsFile);
       }
     });
 
