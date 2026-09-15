@@ -25,7 +25,8 @@ import {
   subscribeToAuth,
   loginWithGoogle,
   logoutUser,
-  checkIsAdmin
+  checkIsAdmin,
+  auth
 } from './firebase';
 
 export default function App() {
@@ -36,15 +37,16 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Current Auth User & Role
-  const [authUser, setAuthUser] = useState(null);
-  const isAdmin = checkIsAdmin(authUser);
+  const [authUser, setAuthUser] = useState(() => auth.currentUser);
+  const isAdmin = checkIsAdmin(authUser || auth.currentUser);
 
   // Auth Required Modal state
   const [isAuthRequiredModalOpen, setIsAuthRequiredModalOpen] = useState(false);
 
   // Guard helper for mutating actions requiring login
   const requireAuth = (actionCallback) => {
-    if (authUser) {
+    const currentActiveUser = authUser || auth.currentUser;
+    if (currentActiveUser) {
       actionCallback();
     } else {
       setIsAuthRequiredModalOpen(true);
@@ -184,16 +186,23 @@ export default function App() {
   // Add or update observation (Local + Cloud)
   const handleSaveObservation = (obsObj) => {
     requireAuth(() => {
-      const existingIndex = observations.findIndex((o) => o.id === obsObj.id);
+      const currentActiveUser = authUser || auth.currentUser;
+      const fullObsObj = {
+        ...obsObj,
+        authorUid: obsObj.authorUid || (currentActiveUser ? currentActiveUser.uid : 'anonymous'),
+        authorEmail: obsObj.authorEmail || (currentActiveUser ? currentActiveUser.email : ''),
+        authorName: obsObj.authorName || (currentActiveUser ? (currentActiveUser.displayName || currentActiveUser.email) : 'Исследователь')
+      };
+      const existingIndex = observations.findIndex((o) => o.id === fullObsObj.id);
       if (existingIndex >= 0) {
         const updated = [...observations];
-        updated[existingIndex] = obsObj;
+        updated[existingIndex] = fullObsObj;
         setObservations(updated);
       } else {
-        setObservations([obsObj, ...observations]);
+        setObservations([fullObsObj, ...observations]);
       }
       // Save to Firestore Cloud
-      saveObservationToCloud(obsObj);
+      saveObservationToCloud(fullObsObj);
     });
   };
 
