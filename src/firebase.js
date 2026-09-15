@@ -35,10 +35,10 @@ const googleProvider = new GoogleAuthProvider();
 // Check redirect result on load if user returned from redirect login
 getRedirectResult(auth).catch((err) => console.warn("Redirect auth result:", err));
 
-// List of Admin emails (add any admin emails here or configure dynamically)
+// List of Admin emails
 export const ADMIN_EMAILS = [
-  "qmanq@example.com",
-  "admin@ebita.org"
+  "0.q.man.q.0@gmail.com",
+  "evgenijboldarev878@gmail.com"
 ];
 
 // Check if user is an admin
