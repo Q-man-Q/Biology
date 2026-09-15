@@ -10,7 +10,9 @@ import {
 } from "firebase/firestore";
 import { 
   getAuth, 
-  signInAnonymously, 
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
   onAuthStateChanged 
 } from "firebase/auth";
 
@@ -26,18 +28,47 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
-// Initialize background seamless anonymous authentication
-export function initAnonymousAuth(onUser) {
+// List of Admin emails (add any admin emails here or configure dynamically)
+export const ADMIN_EMAILS = [
+  "qmanq@example.com",
+  "admin@ebita.org"
+];
+
+// Check if user is an admin
+export function checkIsAdmin(user) {
+  if (!user || !user.email) return false;
+  // If email is in ADMIN_EMAILS list or user has custom admin claim
+  return ADMIN_EMAILS.includes(user.email.toLowerCase());
+}
+
+// Subscribe to Auth state changes
+export function subscribeToAuth(onUserChange) {
   return onAuthStateChanged(auth, (user) => {
-    if (!user) {
-      signInAnonymously(auth).catch((err) => {
-        console.error("Anonymous authentication error:", err);
-      });
-    } else {
-      if (onUser) onUser(user);
-    }
+    onUserChange(user);
   });
+}
+
+// Google Login
+export async function loginWithGoogle() {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user;
+  } catch (error) {
+    console.error("Google Sign-In Error:", error);
+    throw error;
+  }
+}
+
+// Sign Out
+export async function logoutUser() {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error("Logout Error:", error);
+    throw error;
+  }
 }
 
 // Get current user UID
@@ -93,10 +124,12 @@ export function subscribeToObservations(onUpdate, onError) {
 export async function saveObservationToCloud(obsObj) {
   if (!obsObj.id) return;
   try {
-    const userUid = getCurrentUserUid();
+    const currentUser = auth.currentUser;
     const payload = {
       ...obsObj,
-      authorUid: obsObj.authorUid || userUid || 'anonymous'
+      authorUid: obsObj.authorUid || (currentUser ? currentUser.uid : 'anonymous'),
+      authorEmail: obsObj.authorEmail || (currentUser ? currentUser.email : ''),
+      authorName: obsObj.authorName || (currentUser ? currentUser.displayName : 'Пользователь')
     };
     const docRef = doc(db, OBS_COLLECTION, String(obsObj.id));
     const cleaned = cleanForFirestore(payload);
@@ -125,13 +158,15 @@ export async function deleteObservationFromCloud(obsId) {
 export async function batchSaveObservationsToCloud(obsArray) {
   if (!Array.isArray(obsArray)) return;
   try {
-    const userUid = getCurrentUserUid();
+    const currentUser = auth.currentUser;
     const batch = writeBatch(db);
     obsArray.forEach((obs) => {
       if (obs.id) {
         const payload = {
           ...obs,
-          authorUid: obs.authorUid || userUid || 'anonymous'
+          authorUid: obs.authorUid || (currentUser ? currentUser.uid : 'anonymous'),
+          authorEmail: obs.authorEmail || (currentUser ? currentUser.email : ''),
+          authorName: obs.authorName || (currentUser ? currentUser.displayName : 'Пользователь')
         };
         const docRef = doc(db, OBS_COLLECTION, String(obs.id));
         const cleaned = cleanForFirestore(payload);

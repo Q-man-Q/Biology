@@ -21,7 +21,10 @@ import {
   batchSaveObservationsToCloud,
   subscribeToReservePoints,
   saveReservePointsToCloud,
-  initAnonymousAuth
+  subscribeToAuth,
+  loginWithGoogle,
+  logoutUser,
+  checkIsAdmin
 } from './firebase';
 
 export default function App() {
@@ -31,8 +34,9 @@ export default function App() {
   // Search filter query
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Current Auth User
+  // Current Auth User & Role
   const [authUser, setAuthUser] = useState(null);
+  const isAdmin = checkIsAdmin(authUser);
 
   // Reserve Quarters and Outer Boundary state (persisted & synced)
   const [reservePoints, setReservePoints] = useState(() => {
@@ -77,8 +81,8 @@ export default function App() {
 
   // Realtime Cloud Synchronization & Auth via Firestore
   useEffect(() => {
-    // Background seamless anonymous auth
-    const unsubscribeAuth = initAnonymousAuth((user) => {
+    // Listen for Google Auth state
+    const unsubscribeAuth = subscribeToAuth((user) => {
       setAuthUser(user);
     });
 
@@ -92,7 +96,7 @@ export default function App() {
       (err) => {
         console.error("Firestore sync error:", err);
         if (err?.code === 'permission-denied') {
-          setCloudError("Внимание: База данных блокирует доступ. Нажмите синюю кнопку «Publish» (Опубликовать) на вкладке Rules в Firebase Console.");
+          setCloudError("Внимание: База данных блокирует доступ. Авторизуйтесь через Google или проверьте правила в Firebase Console.");
         } else {
           setCloudError("Ошибка синхронизации с облаком Firebase: " + (err?.message || "Нет соединения"));
         }
@@ -254,10 +258,21 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onOpenNewObservation={() => {
-          setEditingObservation(null);
-          setIsObservationModalOpen(true);
+          if (!authUser) {
+            loginWithGoogle().then(() => {
+              setEditingObservation(null);
+              setIsObservationModalOpen(true);
+            }).catch(console.error);
+          } else {
+            setEditingObservation(null);
+            setIsObservationModalOpen(true);
+          }
         }}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        user={authUser}
+        isAdmin={isAdmin}
+        onLogin={loginWithGoogle}
+        onLogout={logoutUser}
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
@@ -311,10 +326,20 @@ export default function App() {
           {activeTab === 'observations' && (
             <ObservationsTab
               observations={filteredObservations}
+              user={authUser}
+              isAdmin={isAdmin}
               onOpenNewObservation={() => {
-                setEditingObservation(null);
-                setIsModalReadOnly(false);
-                setIsObservationModalOpen(true);
+                if (!authUser) {
+                  loginWithGoogle().then(() => {
+                    setEditingObservation(null);
+                    setIsModalReadOnly(false);
+                    setIsObservationModalOpen(true);
+                  });
+                } else {
+                  setEditingObservation(null);
+                  setIsModalReadOnly(false);
+                  setIsObservationModalOpen(true);
+                }
               }}
               onViewObservation={(obs) => {
                 setEditingObservation(obs);
