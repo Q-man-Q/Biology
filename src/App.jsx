@@ -14,6 +14,14 @@ import SettingsModal from './components/SettingsModal';
 import importedPointsFile from '../ebita_reserve_boundaries.json';
 import { INITIAL_OBSERVATIONS, MAMMALS_SPECIES, BIOTOPES_LIST } from './data/ebitaData';
 import { computeOuterBoundaryFromQuarters } from './utils/snapping';
+import { 
+  subscribeToObservations, 
+  saveObservationToCloud, 
+  deleteObservationFromCloud, 
+  batchSaveObservationsToCloud,
+  subscribeToReservePoints,
+  saveReservePointsToCloud
+} from './firebase';
 
 export default function App() {
   // Navigation tab: 'home' | 'observations' | 'species' | 'biotopes' | 'maps' | 'export'
@@ -22,7 +30,7 @@ export default function App() {
   // Search filter query
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Reserve Quarters and Outer Boundary state (persisted)
+  // Reserve Quarters and Outer Boundary state (persisted & synced)
   const [reservePoints, setReservePoints] = useState(() => {
     const saved = localStorage.getItem('ebita_eco_reserve_points');
     let quarters = importedPointsFile.quarters || [];
@@ -45,7 +53,7 @@ export default function App() {
     };
   });
 
-  // Observations state (empty by default)
+  // Observations state (empty by default, synced via Firestore)
   const [observations, setObservations] = useState(() => {
     const saved = localStorage.getItem('ebita_eco_observations');
     if (saved) {
@@ -59,6 +67,30 @@ export default function App() {
     }
     return [];
   });
+
+  // Realtime Cloud Synchronization via Firestore
+  useEffect(() => {
+    const unsubscribeObs = subscribeToObservations((cloudObs) => {
+      if (cloudObs && cloudObs.length > 0) {
+        setObservations(cloudObs);
+      }
+    });
+
+    const unsubscribePoints = subscribeToReservePoints((cloudPoints) => {
+      if (cloudPoints && cloudPoints.quarters && cloudPoints.quarters.length > 0) {
+        const outerBoundary = computeOuterBoundaryFromQuarters(cloudPoints.quarters);
+        setReservePoints({
+          quarters: cloudPoints.quarters,
+          outerBoundary
+        });
+      }
+    });
+
+    return () => {
+      unsubscribeObs();
+      unsubscribePoints();
+    };
+  }, []);
 
   // System Settings State (persisted)
   const [appSettings, setAppSettings] = useState(() => {
@@ -108,7 +140,7 @@ export default function App() {
     localStorage.setItem('ebita_app_settings', JSON.stringify(appSettings));
   }, [appSettings]);
 
-  // Add or update observation
+  // Add or update observation (Local + Cloud)
   const handleSaveObservation = (obsObj) => {
     const existingIndex = observations.findIndex((o) => o.id === obsObj.id);
     if (existingIndex >= 0) {
@@ -118,23 +150,30 @@ export default function App() {
     } else {
       setObservations([obsObj, ...observations]);
     }
+    // Save to Firestore Cloud
+    saveObservationToCloud(obsObj);
   };
 
-  // Delete observation
+  // Delete observation (Local + Cloud)
   const handleDeleteObservation = (obsId) => {
     setObservations(observations.filter((o) => o.id !== obsId));
+    // Delete from Firestore Cloud
+    deleteObservationFromCloud(obsId);
   };
 
   // Import new payload (e.g. from JSON file upload)
   const handleImportData = (payload) => {
     if (payload.observations && Array.isArray(payload.observations)) {
       setObservations(payload.observations);
+      batchSaveObservationsToCloud(payload.observations);
     }
     if (payload.quarters || payload.outerBoundary) {
-      setReservePoints({
+      const newPoints = {
         quarters: payload.quarters || reservePoints.quarters,
         outerBoundary: payload.outerBoundary || reservePoints.outerBoundary
-      });
+      };
+      setReservePoints(newPoints);
+      saveReservePointsToCloud(newPoints);
     }
   };
 
