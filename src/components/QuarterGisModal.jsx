@@ -271,6 +271,7 @@ export default function QuarterGisModal({
       const qIndex = displayQuarters.findIndex((q) => String(q.id) === String(currentQuarter.id));
       if (qIndex >= 0 && displayQuarters[qIndex].polygon) {
         const polyPts = displayQuarters[qIndex].polygon;
+        const liveGeoCoords = polyPts.map((pt) => pctToLatLng(pt, calibration));
 
         // A. Draggable Corner Vertex Markers (Golden circles)
         polyPts.forEach((pt, pIdx) => {
@@ -286,8 +287,17 @@ export default function QuarterGisModal({
             })
           });
 
-          // Live Drag updates polygon
+          // Live 60FPS Drag (natively updates polygon line in Leaflet without React re-renders)
           vertexMarker.on('drag', (e) => {
+            const newLatLng = e.target.getLatLng();
+            liveGeoCoords[pIdx] = [newLatLng.lat, newLatLng.lng];
+            if (selectedPoly) {
+              selectedPoly.setLatLngs(liveGeoCoords);
+            }
+          });
+
+          // Sync with React state ONCE when dragging completes (mouse release)
+          vertexMarker.on('dragend', (e) => {
             const newLatLng = e.target.getLatLng();
             const newPct = latLngToPct(newLatLng.lat, newLatLng.lng, calibration);
 
