@@ -20,7 +20,8 @@ import {
   deleteObservationFromCloud, 
   batchSaveObservationsToCloud,
   subscribeToReservePoints,
-  saveReservePointsToCloud
+  saveReservePointsToCloud,
+  initAnonymousAuth
 } from './firebase';
 
 export default function App() {
@@ -29,6 +30,9 @@ export default function App() {
 
   // Search filter query
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Current Auth User
+  const [authUser, setAuthUser] = useState(null);
 
   // Reserve Quarters and Outer Boundary state (persisted & synced)
   const [reservePoints, setReservePoints] = useState(() => {
@@ -71,8 +75,13 @@ export default function App() {
   // Cloud Sync Status & Errors
   const [cloudError, setCloudError] = useState(null);
 
-  // Realtime Cloud Synchronization via Firestore
+  // Realtime Cloud Synchronization & Auth via Firestore
   useEffect(() => {
+    // Background seamless anonymous auth
+    const unsubscribeAuth = initAnonymousAuth((user) => {
+      setAuthUser(user);
+    });
+
     const unsubscribeObs = subscribeToObservations(
       (cloudObs) => {
         if (Array.isArray(cloudObs)) {
@@ -101,6 +110,7 @@ export default function App() {
     });
 
     return () => {
+      if (unsubscribeAuth) unsubscribeAuth();
       unsubscribeObs();
       unsubscribePoints();
     };

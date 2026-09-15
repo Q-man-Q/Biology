@@ -8,6 +8,11 @@ import {
   deleteDoc,
   writeBatch 
 } from "firebase/firestore";
+import { 
+  getAuth, 
+  signInAnonymously, 
+  onAuthStateChanged 
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAhQChfSv5nE0oV9T5IyEbTh1ce_hK0Jlk",
@@ -20,6 +25,25 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
+
+// Initialize background seamless anonymous authentication
+export function initAnonymousAuth(onUser) {
+  return onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      signInAnonymously(auth).catch((err) => {
+        console.error("Anonymous authentication error:", err);
+      });
+    } else {
+      if (onUser) onUser(user);
+    }
+  });
+}
+
+// Get current user UID
+export function getCurrentUserUid() {
+  return auth.currentUser ? auth.currentUser.uid : null;
+}
 
 // Helper to remove 'undefined' values which cause Firestore setDoc errors
 export function cleanForFirestore(obj) {
@@ -69,8 +93,13 @@ export function subscribeToObservations(onUpdate, onError) {
 export async function saveObservationToCloud(obsObj) {
   if (!obsObj.id) return;
   try {
+    const userUid = getCurrentUserUid();
+    const payload = {
+      ...obsObj,
+      authorUid: obsObj.authorUid || userUid || 'anonymous'
+    };
     const docRef = doc(db, OBS_COLLECTION, String(obsObj.id));
-    const cleaned = cleanForFirestore(obsObj);
+    const cleaned = cleanForFirestore(payload);
     await setDoc(docRef, cleaned, { merge: true });
     console.log("Successfully saved observation to Firestore Cloud:", obsObj.id);
   } catch (err) {
@@ -96,11 +125,16 @@ export async function deleteObservationFromCloud(obsId) {
 export async function batchSaveObservationsToCloud(obsArray) {
   if (!Array.isArray(obsArray)) return;
   try {
+    const userUid = getCurrentUserUid();
     const batch = writeBatch(db);
     obsArray.forEach((obs) => {
       if (obs.id) {
+        const payload = {
+          ...obs,
+          authorUid: obs.authorUid || userUid || 'anonymous'
+        };
         const docRef = doc(db, OBS_COLLECTION, String(obs.id));
-        const cleaned = cleanForFirestore(obs);
+        const cleaned = cleanForFirestore(payload);
         batch.set(docRef, cleaned, { merge: true });
       }
     });
