@@ -68,13 +68,27 @@ export default function App() {
     return [];
   });
 
+  // Cloud Sync Status & Errors
+  const [cloudError, setCloudError] = useState(null);
+
   // Realtime Cloud Synchronization via Firestore
   useEffect(() => {
-    const unsubscribeObs = subscribeToObservations((cloudObs) => {
-      if (cloudObs && cloudObs.length > 0) {
-        setObservations(cloudObs);
+    const unsubscribeObs = subscribeToObservations(
+      (cloudObs) => {
+        if (Array.isArray(cloudObs)) {
+          setObservations(cloudObs);
+          setCloudError(null);
+        }
+      },
+      (err) => {
+        console.error("Firestore sync error:", err);
+        if (err?.code === 'permission-denied') {
+          setCloudError("Внимание: Firebase блокирует доступ. Включите тестовый режим (allow read, write: if true;) в Firebase Console -> Firestore Database -> Rules.");
+        } else {
+          setCloudError("Ошибка синхронизации с облаком Firebase: " + (err?.message || "Нет соединения"));
+        }
       }
-    });
+    );
 
     const unsubscribePoints = subscribeToReservePoints((cloudPoints) => {
       if (cloudPoints && cloudPoints.quarters && cloudPoints.quarters.length > 0) {
@@ -237,6 +251,18 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
+
+      {cloudError && (
+        <div className="bg-amber-900/60 border-b border-amber-500/40 px-4 py-2 text-xs text-amber-200 flex items-center justify-between shrink-0">
+          <span>⚠️ {cloudError}</span>
+          <button 
+            onClick={() => setCloudError(null)}
+            className="text-amber-400 hover:text-amber-100 ml-2 font-bold px-2 py-0.5 rounded"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Main Container (Sidebar + Content View) */}
       <div className="flex-1 flex overflow-hidden relative">

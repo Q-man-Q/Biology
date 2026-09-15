@@ -21,6 +21,21 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
+// Helper to remove 'undefined' values which cause Firestore setDoc errors
+export function cleanForFirestore(obj) {
+  if (obj === null || obj === undefined) return null;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(cleanForFirestore);
+  const cleaned = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (val !== undefined) {
+      cleaned[key] = cleanForFirestore(val);
+    }
+  }
+  return cleaned;
+}
+
 // Collection references
 export const OBS_COLLECTION = "observations";
 export const SETTINGS_COLLECTION = "settings";
@@ -44,7 +59,7 @@ export function subscribeToObservations(onUpdate, onError) {
       onUpdate(list);
     },
     (err) => {
-      console.warn("Firestore observations error:", err);
+      console.error("Firestore observations error:", err);
       if (onError) onError(err);
     }
   );
@@ -55,9 +70,12 @@ export async function saveObservationToCloud(obsObj) {
   if (!obsObj.id) return;
   try {
     const docRef = doc(db, OBS_COLLECTION, String(obsObj.id));
-    await setDoc(docRef, obsObj, { merge: true });
+    const cleaned = cleanForFirestore(obsObj);
+    await setDoc(docRef, cleaned, { merge: true });
+    console.log("Successfully saved observation to Firestore Cloud:", obsObj.id);
   } catch (err) {
     console.error("Error saving observation to Firestore:", err);
+    throw err;
   }
 }
 
@@ -67,8 +85,10 @@ export async function deleteObservationFromCloud(obsId) {
   try {
     const docRef = doc(db, OBS_COLLECTION, String(obsId));
     await deleteDoc(docRef);
+    console.log("Successfully deleted observation from Firestore Cloud:", obsId);
   } catch (err) {
     console.error("Error deleting observation from Firestore:", err);
+    throw err;
   }
 }
 
@@ -80,12 +100,15 @@ export async function batchSaveObservationsToCloud(obsArray) {
     obsArray.forEach((obs) => {
       if (obs.id) {
         const docRef = doc(db, OBS_COLLECTION, String(obs.id));
-        batch.set(docRef, obs, { merge: true });
+        const cleaned = cleanForFirestore(obs);
+        batch.set(docRef, cleaned, { merge: true });
       }
     });
     await batch.commit();
+    console.log(`Successfully batch-saved ${obsArray.length} observations to Firestore Cloud`);
   } catch (err) {
     console.error("Error batch saving observations to Firestore:", err);
+    throw err;
   }
 }
 
@@ -109,7 +132,8 @@ export function subscribeToReservePoints(onUpdate) {
 export async function saveReservePointsToCloud(pointsData) {
   try {
     const pointsDocRef = doc(db, SETTINGS_COLLECTION, "reserve_points");
-    await setDoc(pointsDocRef, pointsData, { merge: true });
+    const cleaned = cleanForFirestore(pointsData);
+    await setDoc(pointsDocRef, cleaned, { merge: true });
   } catch (err) {
     console.error("Error saving reserve points to Firestore:", err);
   }
