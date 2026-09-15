@@ -42,6 +42,14 @@ export default function ObservationsTab({
             Хронологический список всех зафиксированных фактов встреч млекопитающих в ГПЗ «Эбита»
           </p>
         </div>
+
+        <button
+          onClick={onOpenNewObservation}
+          className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg border border-emerald-400/30 flex items-center gap-2 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Добавить наблюдение</span>
+        </button>
       </div>
 
       {/* Filter Bar */}
