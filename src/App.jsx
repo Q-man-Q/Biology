@@ -10,6 +10,7 @@ import MapsTab from './components/MapsTab';
 import ExportTab from './components/ExportTab';
 import ObservationModal from './components/ObservationModal';
 import SettingsModal from './components/SettingsModal';
+import AuthRequiredModal from './components/AuthRequiredModal';
 
 import importedPointsFile from '../ebita_reserve_boundaries.json';
 import { INITIAL_OBSERVATIONS, MAMMALS_SPECIES, BIOTOPES_LIST } from './data/ebitaData';
@@ -37,6 +38,18 @@ export default function App() {
   // Current Auth User & Role
   const [authUser, setAuthUser] = useState(null);
   const isAdmin = checkIsAdmin(authUser);
+
+  // Auth Required Modal state
+  const [isAuthRequiredModalOpen, setIsAuthRequiredModalOpen] = useState(false);
+
+  // Guard helper for mutating actions requiring login
+  const requireAuth = (actionCallback) => {
+    if (authUser) {
+      actionCallback();
+    } else {
+      setIsAuthRequiredModalOpen(true);
+    }
+  };
 
   // Reserve Quarters and Outer Boundary state (persisted & synced)
   const [reservePoints, setReservePoints] = useState(() => {
@@ -170,69 +183,79 @@ export default function App() {
 
   // Add or update observation (Local + Cloud)
   const handleSaveObservation = (obsObj) => {
-    const existingIndex = observations.findIndex((o) => o.id === obsObj.id);
-    if (existingIndex >= 0) {
-      const updated = [...observations];
-      updated[existingIndex] = obsObj;
-      setObservations(updated);
-    } else {
-      setObservations([obsObj, ...observations]);
-    }
-    // Save to Firestore Cloud
-    saveObservationToCloud(obsObj);
+    requireAuth(() => {
+      const existingIndex = observations.findIndex((o) => o.id === obsObj.id);
+      if (existingIndex >= 0) {
+        const updated = [...observations];
+        updated[existingIndex] = obsObj;
+        setObservations(updated);
+      } else {
+        setObservations([obsObj, ...observations]);
+      }
+      // Save to Firestore Cloud
+      saveObservationToCloud(obsObj);
+    });
   };
 
   // Delete observation (Local + Cloud)
   const handleDeleteObservation = (obsId) => {
-    setObservations(observations.filter((o) => o.id !== obsId));
-    // Delete from Firestore Cloud
-    deleteObservationFromCloud(obsId);
+    requireAuth(() => {
+      setObservations(observations.filter((o) => o.id !== obsId));
+      // Delete from Firestore Cloud
+      deleteObservationFromCloud(obsId);
+    });
   };
 
   // Import new payload (e.g. from JSON file upload)
   const handleImportData = (payload) => {
-    if (payload.observations && Array.isArray(payload.observations)) {
-      setObservations(payload.observations);
-      batchSaveObservationsToCloud(payload.observations);
-    }
-    if (payload.quarters || payload.outerBoundary) {
-      const newPoints = {
-        quarters: payload.quarters || reservePoints.quarters,
-        outerBoundary: payload.outerBoundary || reservePoints.outerBoundary
-      };
-      setReservePoints(newPoints);
-      saveReservePointsToCloud(newPoints);
-    }
+    requireAuth(() => {
+      if (payload.observations && Array.isArray(payload.observations)) {
+        setObservations(payload.observations);
+        batchSaveObservationsToCloud(payload.observations);
+      }
+      if (payload.quarters || payload.outerBoundary) {
+        const newPoints = {
+          quarters: payload.quarters || reservePoints.quarters,
+          outerBoundary: payload.outerBoundary || reservePoints.outerBoundary
+        };
+        setReservePoints(newPoints);
+        saveReservePointsToCloud(newPoints);
+      }
+    });
   };
 
   // Reset to initial data
   const handleResetData = () => {
-    localStorage.removeItem('ebita_eco_observations');
-    localStorage.removeItem('ebita_eco_reserve_points');
-    setObservations(INITIAL_OBSERVATIONS);
-    setReservePoints({
-      outerBoundary: importedPointsFile.outerBoundary || [],
-      quarters: importedPointsFile.quarters || []
+    requireAuth(() => {
+      localStorage.removeItem('ebita_eco_observations');
+      localStorage.removeItem('ebita_eco_reserve_points');
+      setObservations(INITIAL_OBSERVATIONS);
+      setReservePoints({
+        outerBoundary: importedPointsFile.outerBoundary || [],
+        quarters: importedPointsFile.quarters || []
+      });
     });
   };
 
   // Add or update observation at photo map click
   const handleAddObservationAtCoords = (lat, lng, xPct, yPct, defaultNote) => {
-    if (pickLocationCallback) {
-      pickLocationCallback(lat, lng, xPct, yPct);
-      setPickLocationCallback(null);
-    } else {
-      setEditingObservation({
-        lat,
-        lng,
-        xPct,
-        yPct,
-        note: defaultNote || '',
-        date: new Date().toISOString().split('T')[0],
-        time: new Date().toTimeString().slice(0, 5)
-      });
-      setIsObservationModalOpen(true);
-    }
+    requireAuth(() => {
+      if (pickLocationCallback) {
+        pickLocationCallback(lat, lng, xPct, yPct);
+        setPickLocationCallback(null);
+      } else {
+        setEditingObservation({
+          lat,
+          lng,
+          xPct,
+          yPct,
+          note: defaultNote || '',
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toTimeString().slice(0, 5)
+        });
+        setIsObservationModalOpen(true);
+      }
+    });
   };
 
   // Calculate statistics for bottom footer
@@ -438,6 +461,13 @@ export default function App() {
         quarters={reservePoints.quarters}
         onImportData={handleImportData}
         onResetData={handleResetData}
+      />
+
+      {/* Auth Required Modal */}
+      <AuthRequiredModal
+        isOpen={isAuthRequiredModalOpen}
+        onClose={() => setIsAuthRequiredModalOpen(false)}
+        onLogin={loginWithGoogle}
       />
     </div>
   );
