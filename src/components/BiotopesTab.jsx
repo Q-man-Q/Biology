@@ -4,9 +4,9 @@ import { BIOTOPES_LIST } from '../data/ebitaData';
 
 export default function BiotopesTab({ observations = [], onSelectBiotopeFilter }) {
   const biotopeStats = BIOTOPES_LIST.map((biotopeName) => {
-    const matchedObs = observations.filter((o) => o.biotope === biotopeName);
+    const matchedObs = observations.filter((o) => o && o.biotope === biotopeName);
     const count = matchedObs.length;
-    const speciesSet = new Set(matchedObs.map((o) => o.species));
+    const speciesSet = new Set(matchedObs.filter(o => o.species).map((o) => o.species));
 
     return {
       name: biotopeName,

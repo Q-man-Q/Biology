@@ -158,19 +158,47 @@ export default function App() {
   // Callback when picking coords on map
   const [pickLocationCallback, setPickLocationCallback] = useState(null);
 
-  // Save observations to localStorage
+  // Save observations to localStorage (with quota handling and fallback)
   useEffect(() => {
-    localStorage.setItem('ebita_eco_observations', JSON.stringify(observations));
+    try {
+      localStorage.setItem('ebita_eco_observations', JSON.stringify(observations));
+    } catch (e) {
+      console.warn("Storage quota exceeded. Saving lightweight metadata without large photos...", e);
+      try {
+        // Fallback: save observations without heavy base64 photos so offline text data still persists
+        const lightweightObs = observations.map(obs => {
+          if (!obs) return obs;
+          if (Array.isArray(obs.photos) && obs.photos.length > 0) {
+            return {
+              ...obs,
+              photos: obs.photos.filter(p => typeof p === 'string' && !p.startsWith('data:image'))
+            };
+          }
+          return obs;
+        });
+        localStorage.setItem('ebita_eco_observations', JSON.stringify(lightweightObs));
+      } catch (err2) {
+        console.warn("Unable to save even lightweight observations to localStorage:", err2);
+      }
+    }
   }, [observations]);
 
   // Save reserve points to localStorage
   useEffect(() => {
-    localStorage.setItem('ebita_eco_reserve_points', JSON.stringify(reservePoints));
+    try {
+      localStorage.setItem('ebita_eco_reserve_points', JSON.stringify(reservePoints));
+    } catch (e) {
+      console.warn("Failed to cache reserve points to localStorage:", e);
+    }
   }, [reservePoints]);
 
   // Save system settings to localStorage
   useEffect(() => {
-    localStorage.setItem('ebita_app_settings', JSON.stringify(appSettings));
+    try {
+      localStorage.setItem('ebita_app_settings', JSON.stringify(appSettings));
+    } catch (e) {
+      console.warn("Failed to cache app settings to localStorage:", e);
+    }
   }, [appSettings]);
 
   // Add or update observation (Local + Cloud)
@@ -257,21 +285,22 @@ export default function App() {
     });
   };
 
-  // Calculate statistics for bottom footer
-  const uniqueSpeciesCount = new Set(observations.map((o) => o.species)).size;
-  const uniqueBiotopesCount = new Set(observations.map((o) => o.biotope)).size;
-  const lastObservationDate = observations.length > 0 ? observations[0].date : '—';
+  // Calculate statistics for bottom footer (safely filtering valid observations)
+  const validObservations = observations.filter(o => o && typeof o === 'object');
+  const uniqueSpeciesCount = new Set(validObservations.filter(o => o.species).map((o) => o.species)).size;
+  const uniqueBiotopesCount = new Set(validObservations.filter(o => o.biotope).map((o) => o.biotope)).size;
+  const lastObservationDate = validObservations.length > 0 && validObservations[0]?.date ? validObservations[0].date : '—';
 
   // Filter observations by search query if set
   const filteredObservations = searchQuery.trim()
-    ? observations.filter(
+    ? validObservations.filter(
         (o) =>
-          o.species.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (o.biotope && o.biotope.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (o.description && o.description.toLowerCase().includes(searchQuery.toLowerCase()))
+          String(o.species || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          String(o.id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (o.biotope && String(o.biotope).toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (o.description && String(o.description).toLowerCase().includes(searchQuery.toLowerCase()))
       )
-    : observations;
+    : validObservations;
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 font-sans overflow-hidden select-none">

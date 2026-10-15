@@ -17,11 +17,12 @@ export default function ObservationsTab({
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredObservations = observations.filter((obs) => {
+    if (!obs) return false;
     const matchesSearch =
-      obs.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      obs.species.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (obs.description && obs.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (obs.note && obs.note.toLowerCase().includes(searchTerm.toLowerCase()));
+      String(obs.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(obs.species || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (obs.description && String(obs.description).toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (obs.note && String(obs.note).toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesType = filterType === 'ALL' || obs.detectionType === filterType;
     const matchesBiotope = filterBiotope === 'ALL' || obs.biotope === filterBiotope;

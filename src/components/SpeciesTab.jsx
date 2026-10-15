@@ -8,7 +8,10 @@ export default function SpeciesTab({ observations = [], onSelectSpeciesFilter })
   // Calculate observations count and individuals count per species
   const speciesStats = MAMMALS_SPECIES.map((s) => {
     const matchedObs = observations.filter(
-      (o) => o.species.toLowerCase() === s.name.toLowerCase() || (o.speciesLatin && o.speciesLatin.toLowerCase() === s.latinName.toLowerCase())
+      (o) =>
+        o &&
+        (String(o.species || '').toLowerCase() === s.name.toLowerCase() ||
+          (o.speciesLatin && String(o.speciesLatin).toLowerCase() === s.latinName.toLowerCase()))
     );
     const obsCount = matchedObs.length;
     const totalIndividuals = matchedObs.reduce((sum, o) => sum + (parseInt(o.count, 10) || 1), 0);

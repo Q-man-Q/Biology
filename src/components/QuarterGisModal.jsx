@@ -393,14 +393,22 @@ export default function QuarterGisModal({
   }, [isOpen, currentQuarter, displayQuarters, outerBoundary, calibration, isSnappingActive, isManualEditActive]);
 
   const handleSaveGisCalibration = () => {
-    localStorage.setItem('ebita_gis_calibration', JSON.stringify(calibration));
+    try {
+      localStorage.setItem('ebita_gis_calibration', JSON.stringify(calibration));
+    } catch (e) {
+      console.warn('Failed to save calibration to localStorage:', e);
+    }
     alert('Настройки масштаба и гео-привязки сохранены!');
     setIsGisCalibrating(false);
   };
 
   const handleResetGisCalibration = () => {
     setCalibration(DEFAULT_GIS_CALIBRATION);
-    localStorage.setItem('ebita_gis_calibration', JSON.stringify(DEFAULT_GIS_CALIBRATION));
+    try {
+      localStorage.setItem('ebita_gis_calibration', JSON.stringify(DEFAULT_GIS_CALIBRATION));
+    } catch (e) {
+      console.warn('Failed to reset calibration in localStorage:', e);
+    }
   };
 
   const handleCopySettings = () => {

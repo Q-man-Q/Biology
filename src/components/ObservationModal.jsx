@@ -85,9 +85,36 @@ export default function ObservationModal({
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Compress image to max 1000px, JPEG 0.7 quality to stay well within quotas
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotos([...photos, reader.result]);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1000;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressed = canvas.toDataURL('image/jpeg', 0.7);
+          setPhotos(prev => [...prev, compressed]);
+        };
+        img.onerror = () => {
+          // Fallback to original if canvas decode fails
+          setPhotos(prev => [...prev, event.target.result]);
+        };
+        img.src = event.target.result;
       };
       reader.readAsDataURL(file);
     }
